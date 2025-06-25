@@ -1,6 +1,6 @@
 # backend/app.py
 from typing import Dict
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file, make_response
 from flask_cors import CORS
 import uuid
 from datetime import datetime
@@ -8,8 +8,9 @@ from datetime import datetime
 from config import Config
 # from services.analyst_service import AnalystService
 from services.communications_service import CommunicationsService
-from db import get_customers, get_products, get_orders, update_product_stock
+from db import get_customers, get_products, get_orders, update_product_stock, get_order_by_id
 from services.order_processor import OrderProcessor
+from services.pdf_service import PdfService
 
 # Validate configuration
 Config.validate()
@@ -21,6 +22,7 @@ CORS(app, resources={r"/api/*": {"origins": Config.CORS_ORIGINS}})
 # Initialize services
 # analyst_service = AnalystService()
 communications_service = CommunicationsService()
+pdf_service = PdfService()
 
 class TwoAgentOrderProcessor:
     """Two-Agent Order Processing System."""
@@ -185,10 +187,9 @@ def get_orders_endpoint():
     
 @app.route("/api/get-order/<order_id>", methods=["GET"])
 def get_order_detail(order_id):
-    """Get full details for a specific order."""
+    """Get full details for a specific order, including items."""
     try:
-        orders = get_orders()
-        order = next((o for o in orders if (o.get("o_id") or o.get("order_id")) == order_id), None)
+        order = get_order_by_id(order_id)
         if not order:
             return jsonify({"error": "Order not found"}), 404
         return jsonify({"order": order})
@@ -246,6 +247,23 @@ def analyze_order_only():
             "analysis": briefing_document
         })
         
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/generate-sales-order-pdf/<order_id>", methods=["GET"])
+def generate_sales_order_pdf_endpoint(order_id):
+    """Generate and return a sales order PDF for a specific order."""
+    try:
+        orders = get_orders()
+        order = next((o for o in orders if (o.get("o_id") or o.get("order_id")) == order_id), None)
+        if not order:
+            return jsonify({"error": "Order not found"}), 404
+        pdf_bytes = pdf_service.generate_sales_order_pdf(order)
+        response = make_response(pdf_bytes)
+        response.headers.set('Content-Type', 'application/pdf')
+        response.headers.set('Content-Disposition', f'attachment; filename=sales_order_{order_id}.pdf')
+        return response
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

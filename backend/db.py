@@ -146,6 +146,41 @@ async def _update_product_stock_async(product_id, new_stock):
         await connection.close()
         return False
 
+def get_order_by_id(order_id):
+    return run_async(_get_order_by_id_async(order_id))
+
+async def _get_order_by_id_async(order_id):
+    connection = await get_connection()
+    if not connection:
+        print("Database connection failed.")
+        return None
+    try:
+        order_row = await connection.fetchrow(
+            """
+            SELECT o_id, c_id, c_name, o_delivery_date, c_address, o_remarks, o_placed_time, o_status
+            FROM orders WHERE o_id = $1;
+            """,
+            order_id
+        )
+        if not order_row:
+            await connection.close()
+            return None
+        items = await connection.fetch(
+            "SELECT oi_id, p_id, p_name, oi_qty, oi_price, oi_total, oi_is_available FROM order_items WHERE o_id = $1;",
+            order_id
+        )
+        items_list = [dict(item) for item in items]
+        total = float(sum(item["oi_total"] for item in items))
+        order_dict = dict(order_row)
+        order_dict["items"] = items_list
+        order_dict["total_value"] = total
+        await connection.close()
+        return order_dict
+    except Exception as e:
+        print(f"Error fetching order by id: {e}")
+        await connection.close()
+        return None
+
 if __name__ == "__main__":
     customers = get_customers()
     print("Customers:", customers)

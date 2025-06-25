@@ -193,18 +193,40 @@ function OrderDetailModal({ order, loading, onClose }) {
     );
   }
   const items = order.items || order.products || [];
+
+  // Print handler
+  const handlePrintOrder = async (orderId) => {
+    try {
+      const response = await fetch(`http://localhost:5001/api/generate-sales-order-pdf/${orderId}`);
+      if (!response.ok) throw new Error('Failed to generate PDF');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (err) {
+      alert('Failed to generate PDF.');
+    }
+  };
+
   return (
     <div className="fixed inset-0 backdrop-blur-xs bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200">
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold text-gray-800">Order Details</h2>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-            >
-              <X className="h-6 w-6 text-gray-600" />
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handlePrintOrder(order.o_id || order.order_id)}
+                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+              >
+                Print
+              </button>
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="h-6 w-6 text-gray-600" />
+              </button>
+            </div>
           </div>
         </div>
         <div className="p-6 text-gray-800 space-y-6">
