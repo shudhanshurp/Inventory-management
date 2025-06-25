@@ -1,0 +1,154 @@
+"use client";
+
+import { Warehouse } from "lucide-react";
+import { useState, useEffect } from "react";
+
+const StockStatus = ({ stock }) => {
+  if (stock === 0) {
+    return (
+      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+        Out of Stock
+      </span>
+    );
+  }
+  if (stock <= 5) {
+    return (
+      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
+        Low Stock
+      </span>
+    );
+  }
+  return (
+    <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
+      In Stock
+    </span>
+  );
+};
+
+const formatCurrency = (amount) => {
+  if (typeof amount !== "number") amount = Number(amount) || 0;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(amount);
+};
+
+export default function InventoryPage() {
+  const [inventory, setInventory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    fetchInventory();
+  }, []);
+
+  const fetchInventory = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("http://localhost:5001/api/products");
+      if (!response.ok) throw new Error("Failed to fetch inventory");
+      const data = await response.json();
+      // Defensive: ensure inventory is always an array
+      let products = [];
+      if (Array.isArray(data.products)) {
+        products = data.products;
+      } else if (data.products && typeof data.products === "object") {
+        products = Object.values(data.products);
+      }
+      setInventory(products);
+      setError(null);
+    } catch (err) {
+      setError("Failed to load inventory. Please try again later.");
+      setInventory([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-12 font-sans">
+        <div className="flex items-center gap-3">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <span className="text-lg text-gray-600">Loading inventory...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-12 font-sans">
+        <div className="text-center">
+          <div className="text-red-600 text-lg mb-4">{error}</div>
+          <button
+            onClick={fetchInventory}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen flex-col items-center bg-gray-50 p-12 font-sans">
+      <div className="flex items-center gap-3 mb-8">
+        <Warehouse className="h-8 w-8 text-gray-700" />
+        <h1 className="text-3xl font-bold text-gray-800">Product Inventory</h1>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <table className="min-w-full text-left text-sm">
+          <thead className="bg-gray-100 border-b border-gray-200">
+            <tr>
+              <th className="px-6 py-3 font-medium text-gray-600">
+                Product ID
+              </th>
+              <th className="px-6 py-3 font-medium text-gray-600">
+                Product Name
+              </th>
+              <th className="px-6 py-3 font-medium text-gray-600">Price</th>
+              <th className="px-6 py-3 font-medium text-gray-600 text-center">
+                Stock Level
+              </th>
+              <th className="px-6 py-3 font-medium text-gray-600 text-center">
+                Status
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {inventory.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
+                  No products found.
+                </td>
+              </tr>
+            ) : (
+              inventory.map((item) => (
+                <tr key={item.p_id} className="border-b border-gray-200">
+                  <td className="px-6 py-4 font-mono text-blue-600">
+                    {item.p_id}
+                  </td>
+                  <td className="px-6 py-4 text-gray-800">
+                    {item.p_name}
+                  </td>
+                  <td className="px-6 py-4 text-gray-600">
+                    {formatCurrency(item.p_price)}
+                  </td>
+                  <td className="px-6 py-4 text-gray-800 font-medium text-center">
+                    {item.p_stock}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <StockStatus stock={item.p_stock} />
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
