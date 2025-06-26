@@ -4,8 +4,8 @@ google-generativeai==0.8.5
 asyncpg==0.29.0
 pydantic==2.11.7
 python-dotenv==1.0.1
-prophet==1.0.1       # Stick with this now
+prophet              # <--- Changed to get the absolute latest stable version
 pandas==2.1.4
-# pystan==2.19.1.1   # Keep commented out or remove
+# pystan==2.19.1.1   # Keep commented out
 langchain
 reportlab
