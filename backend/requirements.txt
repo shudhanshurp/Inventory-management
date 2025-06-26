@@ -9,3 +9,4 @@ pandas==2.1.4
 # pystan==2.19.1.1   # Keep commented out
 langchain
 reportlab
+gunicorn
