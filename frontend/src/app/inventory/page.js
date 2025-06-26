@@ -37,6 +37,10 @@ export default function InventoryPage() {
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [productsPerPage] = useState(10);
+  const [paginatedProducts, setPaginatedProducts] = useState([]);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     fetchInventory();
@@ -56,6 +60,9 @@ export default function InventoryPage() {
         products = Object.values(data.products);
       }
       setInventory(products);
+      const total = products.length;
+      const pages = Math.ceil(total / productsPerPage);
+      setTotalPages(pages);
       setError(null);
     } catch (err) {
       setError("Failed to load inventory. Please try again later.");
@@ -63,6 +70,17 @@ export default function InventoryPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Update paginatedProducts whenever inventory, currentPage, or productsPerPage changes
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * productsPerPage;
+    const endIndex = startIndex + productsPerPage;
+    setPaginatedProducts(inventory.slice(startIndex, endIndex));
+  }, [inventory, currentPage, productsPerPage]);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
   };
 
   if (loading) {
@@ -119,14 +137,14 @@ export default function InventoryPage() {
             </tr>
           </thead>
           <tbody>
-            {inventory.length === 0 ? (
+            {paginatedProducts.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
                   No products found.
                 </td>
               </tr>
             ) : (
-              inventory.map((item) => (
+              paginatedProducts.map((item) => (
                 <tr key={item.p_id} className="border-b border-gray-200">
                   <td className="px-6 py-4 font-mono text-blue-600">
                     {item.p_id}
@@ -148,6 +166,36 @@ export default function InventoryPage() {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Pagination Controls */}
+      <div className="flex items-center justify-center mt-6 space-x-2">
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className={`px-3 py-1 rounded border text-sm font-medium transition-colors ${currentPage === 1 ? 'bg-gray-200 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+        >
+          Previous
+        </button>
+        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+          <button
+            key={page}
+            onClick={() => handlePageChange(page)}
+            className={`px-3 py-1 rounded border text-sm font-medium transition-colors ${currentPage === page ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+          >
+            {page}
+          </button>
+        ))}
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className={`px-3 py-1 rounded border text-sm font-medium transition-colors ${currentPage === totalPages ? 'bg-gray-200 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+        >
+          Next
+        </button>
+        <span className="ml-4 text-gray-500 text-sm">
+          Page {currentPage} of {totalPages}
+        </span>
       </div>
     </div>
   );

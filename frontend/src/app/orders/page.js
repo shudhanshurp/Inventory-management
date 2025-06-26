@@ -45,6 +45,10 @@ export default function OrdersPage() {
   const [error, setError] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [ordersPerPage] = useState(10);
+  const [paginatedOrders, setPaginatedOrders] = useState([]);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     fetchOrders();
@@ -57,12 +61,26 @@ export default function OrdersPage() {
       if (!response.ok) throw new Error("Failed to fetch orders");
       const data = await response.json();
       setOrders(data.orders || []);
+      const total = (data.orders || []).length;
+      const pages = Math.ceil(total / ordersPerPage);
+      setTotalPages(pages);
       setError(null);
     } catch (err) {
       setError("Failed to load orders. Please try again later.");
     } finally {
       setLoading(false);
     }
+  };
+
+  // Update paginatedOrders whenever orders, currentPage, or ordersPerPage changes
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * ordersPerPage;
+    const endIndex = startIndex + ordersPerPage;
+    setPaginatedOrders(orders.slice(startIndex, endIndex));
+  }, [orders, currentPage, ordersPerPage]);
+
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
   };
 
   const fetchOrderDetail = async (orderId) => {
@@ -101,6 +119,7 @@ export default function OrdersPage() {
           </button>
         </div>
       ) : (
+        <>
         <div className="bg-white rounded-lg shadow-md overflow-hidden w-full max-w-6xl">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-gray-100 border-b border-gray-200">
@@ -115,14 +134,14 @@ export default function OrdersPage() {
               </tr>
             </thead>
             <tbody>
-              {orders.length === 0 ? (
+              {paginatedOrders.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-8 text-center text-gray-500">
                     No orders found.
                   </td>
                 </tr>
               ) : (
-                orders.map((order) => (
+                paginatedOrders.map((order) => (
                   <tr
                     key={order.o_id}
                     className="border-b border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors"
@@ -153,6 +172,36 @@ export default function OrdersPage() {
             </tbody>
           </table>
         </div>
+        {/* Pagination Controls */}
+        <div className="flex items-center justify-center mt-6 space-x-2">
+          <button
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            className={`px-3 py-1 rounded border text-sm font-medium transition-colors ${currentPage === 1 ? 'bg-gray-200 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+          >
+            Previous
+          </button>
+          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+            <button
+              key={page}
+              onClick={() => handlePageChange(page)}
+              className={`px-3 py-1 rounded border text-sm font-medium transition-colors ${currentPage === page ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+            >
+              {page}
+            </button>
+          ))}
+          <button
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            className={`px-3 py-1 rounded border text-sm font-medium transition-colors ${currentPage === totalPages ? 'bg-gray-200 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'}`}
+          >
+            Next
+          </button>
+          <span className="ml-4 text-gray-500 text-sm">
+            Page {currentPage} of {totalPages}
+          </span>
+        </div>
+        </>
       )}
 
       {/* Order Detail Modal */}

@@ -23,11 +23,15 @@ The system works as follows:
 - **Dynamic Customer Communication**: Generates tailored email responses for successful orders, orders with errors, and unknown customers.
 - **Transactional Database Updates**: Ensures data integrity by using database transactions for order creation and stock updates.
 - **RESTful API**: Provides clear and documented endpoints for processing orders and retrieving data.
+- **Analytics & Forecasting**: Sales trends, product performance, inventory health, sales and inventory forecasting using Prophet, catalog suggestions.
 
 ### Frontend
-- **Email Submission Form**: A simple interface to submit raw email text for processing.
-- **Real-time Results**: Displays the generated customer message and a full breakdown of the processing results.
-- **Dashboard Views**: (Future enhancement) Tables to display customers, products, and orders from the database.
+- **Analysis Dashboard**: Visualizes sales trends, forecasts, product performance, inventory health, and catalog suggestions.
+- **Order Management**: Paginated order history with detailed modal views and PDF export.
+- **Inventory Management**: Paginated inventory table with stock status indicators.
+- **Responsive UI**: Built with Tailwind CSS for a clean, adaptive experience.
+- **Swiper Carousels**: Used for low/out-of-stock and inventory forecast carousels.
+- **Nivo Charts**: Interactive line and bar charts for analytics.
 
 ## Tech Stack
 
@@ -37,14 +41,17 @@ The system works as follows:
     -   PostgreSQL
     -   `asyncpg` for asynchronous database access
     -   `google-generativeai` for LLM integration
-    -   `Pydantic` for data modeling and validation
+    -   `pydantic` for data modeling and validation
+    -   `prophet` for forecasting
 -   **Frontend**:
     -   Next.js
     -   React
     -   Tailwind CSS
+    -   Swiper (for carousels)
+    -   Nivo (for charts)
 
 ## Project Structure
-```
+
 /practice
 |-- /backend
 |   |-- /services         # Business logic for each agent/service
@@ -63,7 +70,6 @@ The system works as follows:
 |   |-- next.config.mjs   # Next.js configuration
 |   |-- tailwind.config.js
 |   |-- package.json
-```
 
 ## Setup and Installation
 
@@ -96,59 +102,22 @@ The system works as follows:
     ```ini
     # Google Gemini API
     GOOGLE_API_KEY=your_google_api_key
-    GEMINI_MODEL=gemini-pro
+    GEMINI_MODEL=gemini-1.5-flash
 
     # Database Connection
-    DB_USER=your_db_user
-    DB_PASSWORD=your_db_password
-    DB_HOST=localhost
-    DB_PORT=5432
-    DB_NAME=your_db_name
+    SUPABASE_USER=your_db_user
+    SUPABASE_PASSWORD=your_db_password
+    SUPABASE_HOST=localhost
+    SUPABASE_PORT=5432
+    SUPABASE_DBNAME=your_db_name
 
     # Flask & CORS Configuration
-    CORS_ORIGINS=http://localhost:3000
-    FLASK_DEBUG=True
-    FLASK_PORT=5001
+    CORS_ORIGINS=["http://localhost:3000"]
+    DEBUG=True
+    PORT=5001
     ```
 5.  **Database Schema**:
-    Ensure your PostgreSQL database has the required tables. You can use the following SQL schema as a starting point:
-    ```sql
-    CREATE TABLE customers (
-        c_id VARCHAR(50) PRIMARY KEY,
-        c_name VARCHAR(100),
-        c_email VARCHAR(100) UNIQUE,
-        c_address TEXT
-    );
-
-    CREATE TABLE products (
-        p_id VARCHAR(50) PRIMARY KEY,
-        p_name VARCHAR(100),
-        p_price NUMERIC(10, 2),
-        p_stock INT,
-        p_min_quantity INT DEFAULT 1
-    );
-
-    CREATE TABLE orders (
-        o_id VARCHAR(50) PRIMARY KEY,
-        c_id VARCHAR(50) REFERENCES customers(c_id),
-        c_name VARCHAR(100),
-        c_address TEXT,
-        o_status VARCHAR(50),
-        o_placed_time TIMESTAMP,
-        o_delivery_date TIMESTAMP
-    );
-
-    CREATE TABLE order_items (
-        oi_id SERIAL PRIMARY KEY,
-        o_id VARCHAR(50) REFERENCES orders(o_id),
-        p_id VARCHAR(50) REFERENCES products(p_id),
-        p_name VARCHAR(100),
-        oi_qty INT,
-        oi_price NUMERIC(10, 2),
-        oi_total NUMERIC(10, 2),
-        oi_is_available BOOLEAN
-    );
-    ```
+    Ensure your PostgreSQL database has the required tables. See backend/README.md for schema details. Orders table must include `c_name`, `c_address`, and `o_delivery_date` fields.
 
 ### Frontend Setup
 1.  **Navigate to the frontend directory**:
@@ -178,17 +147,22 @@ The system works as follows:
 
 ## API Endpoints
 
--   `POST /api/process-order`
-    -   **Description**: The main endpoint to process an order from email text.
-    -   **Body**: `{ "email_text": "..." }`
-    -   **Response**: A JSON object containing the results from the entire processing pipeline.
--   `GET /api/get-orders`
-    -   **Description**: Retrieves a list of all orders with basic information.
--   `GET /api/get-order/<order_id>`
-    -   **Description**: Fetches the full details for a single order.
--   `GET /api/customers`
-    -   **Description**: Returns a list of all customers in the database.
--   `GET /api/products`
-    -   **Description**: Returns a list of all products in the database.
--   `GET /api/health`
-    -   **Description**: A simple health check endpoint. 
+-   `POST /api/process-order` — Process an order from email text
+-   `GET /api/get-orders` — List all orders
+-   `GET /api/get-order/<order_id>` — Get full order details
+-   `GET /api/customers` — List all customers
+-   `GET /api/products` — List all products
+-   `GET /api/health` — Health check
+-   `GET /api/generate-sales-order-pdf/<order_id>` — Generate PDF for an order
+-   `GET /api/analytics/kpis` — KPIs
+-   `GET /api/analytics/sales-trends` — Sales trends
+-   `GET /api/analytics/order-status` — Order status distribution
+-   `GET /api/analytics/inventory-health` — Inventory health
+-   `GET /api/analytics/product-performance` — Product performance
+-   `GET /api/analytics/forecast/sales` — Sales forecast
+-   `GET /api/analytics/forecast/inventory-needs` — Inventory needs forecast
+-   `GET /api/analytics/suggest-catalog-items` — Catalog suggestions
+
+## License
+
+MIT 

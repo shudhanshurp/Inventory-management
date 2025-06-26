@@ -21,11 +21,11 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white-100`}
       >
-        <div className="flex min-h-screen flex-col">
+        <div className="flex flex-col min-h-screen bg-white-100">
           <Navbar /> {/* 2. Add the Navbar component here */}
-          <main className="flex-grow">{children}</main>
+          <main className="flex-grow overflow-hidden">{children}</main>
         </div>
       </body>
     </html>

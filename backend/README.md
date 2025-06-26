@@ -9,6 +9,8 @@ This backend service processes customer orders using a two-agent system with Sup
 - **Async Database Operations**: Uses asyncpg for efficient PostgreSQL connections
 - **Order Management**: Complete order lifecycle with status tracking
 - **Inventory Management**: Automatic stock updates for confirmed orders
+- **Analytics & Forecasting**: Sales trends, product performance, inventory health, sales and inventory forecasting using Prophet
+- **Catalog Suggestions**: Suggests catalog items based on order errors
 - **Windows Compatible**: Uses asyncpg instead of psycopg2 for better Windows support
 
 ## Setup
@@ -24,7 +26,7 @@ GEMINI_MODEL=gemini-1.5-flash
 
 # Flask Configuration
 DEBUG=True
-PORT=5000
+PORT=5001
 CORS_ORIGINS=["http://localhost:3000"]
 
 # Supabase Database Configuration
@@ -42,7 +44,7 @@ SUPABASE_DBNAME=your_supabase_database_name
 3. The application will automatically create the required tables:
    - `customers` - Customer information
    - `products` - Product catalog with stock levels
-   - `orders` - Order records
+   - `orders` - Order records (must include c_name, c_address, o_delivery_date)
    - `order_items` - Individual items in each order
 
 ### 3. Install Dependencies
@@ -59,48 +61,62 @@ python app.py
 
 ## API Endpoints
 
+### Order & Data Endpoints
 - `POST /api/process-order` - Process customer email and create order
 - `GET /api/get-orders` - Retrieve all orders
+- `GET /api/get-order/<order_id>` - Retrieve full details for a specific order
 - `GET /api/customers` - Get customer list
 - `GET /api/products` - Get product catalog
 - `GET /api/health` - Health check
 - `POST /api/analyze-order` - Analyze order without generating response
+- `GET /api/generate-sales-order-pdf/<order_id>` - Generate a PDF for a specific order
+
+### Analytics & Forecasting Endpoints
+- `GET /api/analytics/kpis` - Get key performance indicators (KPIs)
+- `GET /api/analytics/sales-trends` - Get sales trends (supports granularity)
+- `GET /api/analytics/order-status` - Get order status distribution
+- `GET /api/analytics/inventory-health` - Get inventory health summary
+- `GET /api/analytics/product-performance` - Get top product performance
+- `GET /api/analytics/forecast/sales` - Get sales forecast (uses Prophet)
+- `GET /api/analytics/forecast/inventory-needs` - Get inventory needs forecast (uses Prophet)
+- `GET /api/analytics/suggest-catalog-items` - Get catalog suggestions based on order errors
 
 ## Database Schema
 
 ### Customers Table
-- `id` (VARCHAR) - Customer ID
-- `name` (VARCHAR) - Customer name
-- `email` (VARCHAR) - Customer email
-- `created_at` (TIMESTAMP) - Creation timestamp
+- `c_id` (VARCHAR) - Customer ID
+- `c_name` (VARCHAR) - Customer name
+- `c_email` (VARCHAR) - Customer email
+- `c_address` (TEXT) - Customer address
+- `created_time` (TIMESTAMP) - Creation timestamp
 
 ### Products Table
-- `id` (VARCHAR) - Product ID
-- `name` (VARCHAR) - Product name
-- `price` (DECIMAL) - Product price
-- `stock` (INTEGER) - Available stock
+- `p_id` (VARCHAR) - Product ID
+- `p_name` (VARCHAR) - Product name
+- `p_price` (DECIMAL) - Product price
+- `p_stock` (INTEGER) - Available stock
 - `created_at` (TIMESTAMP) - Creation timestamp
 - `updated_at` (TIMESTAMP) - Last update timestamp
 
 ### Orders Table
-- `order_id` (VARCHAR) - Unique order ID
-- `customer_id` (VARCHAR) - Customer reference
-- `total_value` (DECIMAL) - Order total
-- `status` (VARCHAR) - Order status
-- `email_text` (TEXT) - Original email
-- `customer_response` (TEXT) - Generated response
-- `analysis` (JSONB) - Analysis results
-- `created_at` (TIMESTAMP) - Creation timestamp
-- `updated_at` (TIMESTAMP) - Last update timestamp
+- `o_id` (VARCHAR) - Unique order ID
+- `c_id` (VARCHAR) - Customer reference
+- `c_name` (VARCHAR) - Customer name (required)
+- `c_address` (TEXT) - Customer address (required)
+- `o_delivery_date` (TIMESTAMP) - Delivery date (required, not null)
+- `o_status` (VARCHAR) - Order status
+- `o_placed_time` (TIMESTAMP) - Order placed timestamp
+- `o_remarks` (TEXT) - Remarks
 
 ### Order Items Table
-- `id` (SERIAL) - Auto-increment ID
-- `order_id` (VARCHAR) - Order reference
-- `product_id` (VARCHAR) - Product reference
-- `product_name` (VARCHAR) - Product name
-- `quantity` (INTEGER) - Quantity ordered
-- `price` (DECIMAL) - Price at time of order
-- `created_at` (TIMESTAMP) - Creation timestamp
+- `oi_id` (SERIAL) - Auto-increment ID
+- `o_id` (VARCHAR) - Order reference
+- `p_id` (VARCHAR) - Product reference
+- `p_name` (VARCHAR) - Product name
+- `oi_qty` (INTEGER) - Quantity ordered
+- `oi_price` (DECIMAL) - Price at time of order
+- `oi_total` (DECIMAL) - Total for item
+- `oi_is_available` (BOOLEAN) - Availability
 
 ## Order Statuses
 
@@ -118,6 +134,10 @@ The application uses `asyncpg` for all database operations, providing:
 - Automatic connection pooling
 - Native JSON support
 
+### Forecasting
+- Uses Facebook Prophet for sales and inventory forecasting
+- Forecast endpoints return both historical and forecasted data in a frontend-friendly format
+
 ### Error Handling
 The application includes fallback mechanisms:
 - If database connection fails, it falls back to mock data
@@ -130,6 +150,45 @@ The application includes fallback mechanisms:
 2. **Order Processing**: Analyze email → Create order → Save to database
 3. **Inventory Updates**: Update product stock in real-time
 4. **Data Retrieval**: Fetch orders with related items using JSON aggregation
+
+## System Overview
+
+This system implements a **Two-Agent Response Generation System** with persistent order management and analytics:
+
+1. **Analyst Agent** - Analyzes emails and produces structured briefing documents
+2. **Communications Agent** - Generates professional customer responses
+3. **Order Management** - Maintains persistent order records with status tracking
+4. **Analytics & Forecasting** - Provides business insights and predictions
+
+## Architecture
+
+```
+Email Input → Analyst Agent → Briefing Document → Communications Agent → Customer Response
+     ↓
+Order Record Creation → Status Management → Inventory Adjustment → Persistent Storage
+     ↓
+Analytics & Forecasting → Dashboard
+```
+
+## File Structure
+
+```
+backend/
+├── app.py                          # Main Flask application with order management
+├── config.py                       # Configuration management
+├── db.py                           # Database (asyncpg)
+├── requirements.txt                # Python dependencies
+├── services/
+│   ├── __init__.py
+│   ├── analytics_service.py        # Analytics and forecasting
+│   ├── communications_service.py   # Communications Agent
+│   ├── db_update_service.py        # DB update logic
+│   ├── info_extractor_service.py   # Info extraction (Gemini)
+│   ├── order_processor.py          # Order processing pipeline
+│   ├── pdf_service.py              # PDF generation
+│   └── validator_service.py        # Validation logic
+├── models.py                       # Pydantic models
+```
 
 ## 🎯 System Overview
 
@@ -188,24 +247,6 @@ Process a complete order using both agents and create persistent order record.
 ```json
 {
   "email_text": "Hi, I'm Alice and I need 2 laptops and a wireless mouse"
-}
-```
-
-**Response:**
-```json
-{
-  "status": "error",
-  "message": "Dear Alice Johnson,\n\nThank you for your recent order...",
-  "order_id": "ORD-2025-003",
-  "order_status": "Waiting for Confirmation",
-  "analysis": {
-    "customer_info": {...},
-    "overall_status": "partial_success",
-    "successful_items": [...],
-    "error_items": [...],
-    "suggestions": [...],
-    "summary": {...}
-  }
 }
 ```
 

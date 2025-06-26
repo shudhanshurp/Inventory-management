@@ -8,9 +8,10 @@ from datetime import datetime
 from config import Config
 # from services.analyst_service import AnalystService
 from services.communications_service import CommunicationsService
-from db import get_customers, get_products, get_orders, update_product_stock, get_order_by_id
+from db import get_customers, get_products, get_orders, update_product_stock, get_order_by_id, get_all_customers_dict, _get_orders_async, _get_all_customers_dict_async, _get_products_async, run_async
 from services.order_processor import OrderProcessor
 from services.pdf_service import PdfService
+from services.analytics_service import AnalyticsService
 
 # Validate configuration
 Config.validate()
@@ -24,6 +25,12 @@ CORS(app, resources={r"/api/*": {"origins": Config.CORS_ORIGINS}})
 communications_service = CommunicationsService()
 pdf_service = PdfService()
 
+# Instantiate AnalyticsService
+analytics_service = AnalyticsService(_get_orders_async, _get_all_customers_dict_async, _get_products_async)
+
+# Asynchronously load data into the analytics_service once at startup
+run_async(analytics_service.load_cached_data())
+
 class TwoAgentOrderProcessor:
     """Two-Agent Order Processing System."""
     
@@ -35,34 +42,38 @@ class TwoAgentOrderProcessor:
     
     def process_order(self, email_text: str) -> Dict:
         """Process order using the two-agent system with order record creation."""
-        try:
-            # Step 1: Create new order record
-            order_id = self._generate_order_id()
-            order_record = self._create_order_record(order_id, email_text)
-            
-            # Step 2: Perform validation (existing logic)
-            briefing_document = self.analyst.analyze_order(email_text, self.customers, self.products)
-            
-            # Step 3: Update order status based on validation results
-            self._update_order_status(order_record, briefing_document)
-            
-            # Step 4: Adjust inventory if order is confirmed
-            if order_record["status"] == "Confirmed":
-                self._adjust_inventory(order_record)
-            
-            # Step 5: Generate customer response
-            customer_response = self.communications.generate_customer_response(briefing_document)
-            
-            # Step 6: Update order with final details
-            self._update_order_details(order_record, briefing_document, customer_response)
-            
-            # Step 7: Save order to database
-            save_order(order_record)
-            
-            return self._prepare_final_response(briefing_document, customer_response, order_record)
-            
-        except Exception as e:
-            raise Exception(f"Failed to process order: {str(e)}")
+        # TODO: This method needs to be implemented properly
+        # Currently has issues with missing analyst service and save_order function
+        raise NotImplementedError("Order processing not yet implemented")
+        
+        # try:
+        #     # Step 1: Create new order record
+        #     order_id = self._generate_order_id()
+        #     order_record = self._create_order_record(order_id, email_text)
+        #     
+        #     # Step 2: Perform validation (existing logic)
+        #     briefing_document = self.analyst.analyze_order(email_text, self.customers, self.products)
+        #     
+        #     # Step 3: Update order status based on validation results
+        #     self._update_order_status(order_record, briefing_document)
+        #     
+        #     # Step 4: Adjust inventory if order is confirmed
+        #     if order_record["status"] == "Confirmed":
+        #         self._adjust_inventory(order_record)
+        #     
+        #     # Step 5: Generate customer response
+        #     customer_response = self.communications.generate_customer_response(briefing_document)
+        #     
+        #     # Step 6: Update order with final details
+        #     self._update_order_details(order_record, briefing_document, customer_response)
+        #     
+        #     # Step 7: Save order to database
+        #     save_order(order_record)
+        #     
+        #     return self._prepare_final_response(briefing_document, customer_response, order_record)
+        #     
+        # except Exception as e:
+        #     raise Exception(f"Failed to process order: {str(e)}")
     
     def _generate_order_id(self) -> str:
         """Generate a unique order ID."""
@@ -234,21 +245,25 @@ def get_products_endpoint():
 @app.route("/api/analyze-order", methods=["POST"])
 def analyze_order_only():
     """Analyze order without generating customer response (for debugging)."""
-    try:
-        email_text = request.json.get("email_text")
-        if not email_text:
-            return jsonify({"error": "Email text is required"}), 400
-        
-        # Get only the analysis
-        briefing_document = order_processor.analyst.analyze_order(email_text, order_processor.customers, order_processor.products)
-        
-        return jsonify({
-            "status": "success",
-            "analysis": briefing_document
-        })
-        
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    # TODO: This endpoint needs to be implemented properly
+    # Currently has issues with missing analyst service
+    return jsonify({"error": "Analyze order endpoint not yet implemented"}), 501
+    
+    # try:
+    #     email_text = request.json.get("email_text")
+    #     if not email_text:
+    #         return jsonify({"error": "Email text is required"}), 400
+    #     
+    #     # Get only the analysis
+    #     briefing_document = order_processor.analyst.analyze_order(email_text, order_processor.customers, order_processor.products)
+    #     
+    #     return jsonify({
+    #         "status": "success",
+    #         "analysis": briefing_document
+    #     })
+    #     
+    # except Exception as e:
+    #     return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/generate-sales-order-pdf/<order_id>", methods=["GET"])
@@ -257,6 +272,7 @@ def generate_sales_order_pdf_endpoint(order_id):
     try:
         orders = get_orders()
         order = next((o for o in orders if (o.get("o_id") or o.get("order_id")) == order_id), None)
+        print(f"[APP-PDF] Order data fetched for PDF: {order}")
         if not order:
             return jsonify({"error": "Order not found"}), 404
         pdf_bytes = pdf_service.generate_sales_order_pdf(order)
@@ -267,6 +283,96 @@ def generate_sales_order_pdf_endpoint(order_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+@app.route("/api/analytics/kpis", methods=["GET"])
+def analytics_kpis_endpoint():
+    try:
+        time_filter = request.args.get('time_filter', 'last_30_days')
+        import asyncio
+        result = asyncio.run(analytics_service.get_kpis(time_filter=time_filter))
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/analytics/sales-trends", methods=["GET"])
+def analytics_sales_trends_endpoint():
+    try:
+        time_filter = request.args.get('time_filter', 'last_30_days')
+        granularity = request.args.get('granularity', 'month')
+        import asyncio
+        result = asyncio.run(analytics_service.get_sales_trends(time_filter=time_filter, granularity=granularity))
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/analytics/order-status", methods=["GET"])
+def analytics_order_status_endpoint():
+    try:
+        time_filter = request.args.get('time_filter', 'last_30_days')
+        import asyncio
+        result = asyncio.run(analytics_service.get_order_status_distribution(time_filter=time_filter))
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/analytics/inventory-health", methods=["GET"])
+def analytics_inventory_health_endpoint():
+    try:
+        print(f"[APP] Inventory Health endpoint hit")
+        import asyncio
+        result = asyncio.run(analytics_service.get_inventory_health())
+        print(f"[APP] Inventory Health endpoint returning result.")
+        return jsonify(result)
+    except Exception as e:
+        print(f"[APP] Error in Inventory Health endpoint: {e}")
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/analytics/product-performance", methods=["GET"])
+def analytics_product_performance_endpoint():
+    try:
+        time_filter = request.args.get('time_filter', 'all_time')
+        top_n = int(request.args.get('top_n', 10))
+        import asyncio
+        result = asyncio.run(analytics_service.get_product_performance(time_filter=time_filter, top_n=top_n))
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/analytics/forecast/sales", methods=["GET"])
+def analytics_sales_forecast_endpoint():
+    try:
+        time_filter = request.args.get('time_filter', 'last_365_days')
+        periods = int(request.args.get('periods', 3))
+        granularity = request.args.get('granularity', 'month')
+        import asyncio
+        result = asyncio.run(analytics_service.get_sales_forecast(time_filter=time_filter, periods_to_forecast=periods, granularity=granularity))
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/analytics/forecast/inventory-needs", methods=["GET"])
+def analytics_inventory_needs_forecast_endpoint():
+    try:
+        time_filter = request.args.get('time_filter', 'last_365_days')
+        top_n = int(request.args.get('top_n', 5))
+        periods = int(request.args.get('periods', 3))
+        granularity = request.args.get('granularity', 'month')
+        import asyncio
+        result = asyncio.run(analytics_service.get_inventory_needs_forecast(time_filter=time_filter, top_n_products=top_n, periods_to_forecast=periods, granularity=granularity))
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/analytics/suggest-catalog-items", methods=["GET"])
+def analytics_catalog_suggestions_endpoint():
+    try:
+        time_filter = request.args.get('time_filter', 'all_time')
+        top_n = int(request.args.get('top_n', 5))
+        import asyncio
+        result = asyncio.run(analytics_service.get_catalog_suggestions(time_filter=time_filter, top_n=top_n))
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=Config.DEBUG, port=Config.PORT)

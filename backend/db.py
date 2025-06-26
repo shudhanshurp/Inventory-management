@@ -2,6 +2,7 @@ import asyncpg
 import asyncio
 import os
 from dotenv import load_dotenv
+from datetime import timezone
 
 # Load environment variables from .env
 load_dotenv()
@@ -90,39 +91,59 @@ def get_orders():
     return run_async(_get_orders_async())
 
 async def _get_orders_async():
-    import json
+    from datetime import datetime
+    print("[DB] _get_orders_async: Fetching all orders with items.")
     connection = await get_connection()
     if not connection:
         print("Database connection failed.")
         return []
     try:
-        # Fetch all orders (no total_value column)
+        print("[DB] _get_orders_async: Executing orders fetch.")
+        # asyncpg automatically returns timezone-aware datetime objects for TIMESTAMPTZ columns
         orders = await connection.fetch(
             """
-            SELECT o_id, c_id, c_name, o_delivery_date, c_address, o_remarks, o_placed_time, o_status
+            SELECT o_id, c_id, c_name, o_delivery_date, c_address, o_placed_time, o_status
             FROM orders
             ORDER BY o_placed_time DESC;
             """
         )
         orders_list = []
         for order in orders:
-            # Fetch order items for this order
+            print(f"[DB] _get_orders_async: Fetching items for order {order['o_id']}")
             items = await connection.fetch(
-                "SELECT oi_id, p_id, p_name, oi_qty, oi_price, oi_total, oi_is_available "
-                "FROM order_items WHERE o_id = $1;",
+                "SELECT p_id, p_name, oi_qty, oi_price, oi_total FROM order_items WHERE o_id = $1;",
                 order["o_id"]
             )
-            items_list = [dict(item) for item in items]
-            # Calculate total from oi_total
+            items_list = [
+                {
+                    "p_id": item["p_id"],
+                    "p_name": item["p_name"],
+                    "oi_qty": item["oi_qty"],
+                    "oi_price": float(item["oi_price"]),
+                    "oi_total": float(item["oi_total"])
+                }
+                for item in items
+            ]
             total = float(sum(item["oi_total"] for item in items))
-            order_dict = dict(order)
-            order_dict["items"] = items_list
-            order_dict["total_value"] = total
+            order_dict = {
+                "o_id": order["o_id"],
+                "c_id": order["c_id"],
+                "c_name": order.get("c_name", ""),
+                "c_address": order.get("c_address", ""),
+                "o_delivery_date": order.get("o_delivery_date") or datetime(1970, 1, 1),
+                "o_placed_time": order["o_placed_time"],
+                "total_value": total,
+                "o_status": order["o_status"],
+                "items": items_list
+            }
+            print(f"[DB] _get_orders_async: Order {order_dict['o_id']} customer info: {order_dict.get('c_name')}, {order_dict.get('c_address')}")
             orders_list.append(order_dict)
+        print("[DB] _get_orders_async: Closing connection after orders fetch.")
         await connection.close()
+        print(f"[DB] _get_orders_async: Returning {len(orders_list)} orders.")
         return orders_list
     except Exception as e:
-        print(f"Error fetching orders: {e}")
+        print(f"[DB] Error in _get_orders_async: {e}")
         await connection.close()
         return []
 
@@ -147,7 +168,18 @@ async def _update_product_stock_async(product_id, new_stock):
         return False
 
 def get_order_by_id(order_id):
-    return run_async(_get_order_by_id_async(order_id))
+    order = run_async(_get_order_by_id_async(order_id))
+    # Ensure required fields are present and not None
+    if order is not None:
+        if 'c_name' not in order or order['c_name'] is None:
+            order['c_name'] = ''
+        if 'c_address' not in order or order['c_address'] is None:
+            order['c_address'] = ''
+        if 'o_delivery_date' not in order or order['o_delivery_date'] is None:
+            from datetime import datetime
+            order['o_delivery_date'] = datetime(1970, 1, 1)
+    print(f"[DB] get_order_by_id returning: {order}")
+    return order
 
 async def _get_order_by_id_async(order_id):
     connection = await get_connection()
@@ -180,6 +212,42 @@ async def _get_order_by_id_async(order_id):
         print(f"Error fetching order by id: {e}")
         await connection.close()
         return None
+
+# New: async function to fetch all customers as dict with c_created_time
+async def _get_all_customers_dict_async():
+    from datetime import datetime
+    print("[DB] _get_all_customers_dict_async: Fetching all customers.")
+    connection = await get_connection()
+    if not connection:
+        print("Database connection failed.")
+        return {}
+    try:
+        print("[DB] _get_all_customers_dict_async: Executing customers fetch.")
+        # asyncpg automatically returns timezone-aware datetime objects for TIMESTAMPTZ columns
+        rows = await connection.fetch(
+            "SELECT c_id, c_name, c_email, c_address, c_created_time FROM customers;"
+        )
+        customers = {}
+        for row in rows:
+            customers[row["c_id"]] = {
+                "name": row["c_name"],
+                "email": row["c_email"],
+                "address": row["c_address"],
+                "created_time": row["c_created_time"]  # Already timezone-aware from asyncpg
+            }
+        print("[DB] _get_all_customers_dict_async: Closing connection after customers fetch.")
+        await connection.close()
+        print(f"[DB] _get_all_customers_dict_async: Returning {len(customers)} customers.")
+        return customers
+    except Exception as e:
+        print(f"[DB] Error in _get_all_customers_dict_async: {e}")
+        await connection.close()
+        return {}
+
+# Synchronous wrapper for _get_all_customers_dict_async
+
+def get_all_customers_dict():
+    return run_async(_get_all_customers_dict_async())
 
 if __name__ == "__main__":
     customers = get_customers()
