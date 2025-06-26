@@ -1,7 +1,7 @@
 "use client";
 
 import { History, X, Package, User, Calendar, DollarSign, RefreshCw } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 // Move these helpers OUTSIDE the component
 const getStatusColor = (status) => {
@@ -40,6 +40,7 @@ const formatCurrency = (amount) => {
 };
 
 export default function OrdersPage() {
+  // 1. ALL useState DECLARATIONS FIRST
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -50,14 +51,11 @@ export default function OrdersPage() {
   const [paginatedOrders, setPaginatedOrders] = useState([]);
   const [totalPages, setTotalPages] = useState(1);
 
-  useEffect(() => {
-    fetchOrders();
-  }, [fetchOrders]);
-
-  const fetchOrders = async () => {
+  // 2. ALL useCallback WRAPPED FUNCTION DECLARATIONS NEXT
+  const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:5001/api/get-orders");
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/get-orders`);
       if (!response.ok) throw new Error("Failed to fetch orders");
       const data = await response.json();
       setOrders(data.orders || []);
@@ -70,23 +68,12 @@ export default function OrdersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [ordersPerPage, setLoading, setOrders, setTotalPages, setError]);
 
-  // Update paginatedOrders whenever orders, currentPage, or ordersPerPage changes
-  useEffect(() => {
-    const startIndex = (currentPage - 1) * ordersPerPage;
-    const endIndex = startIndex + ordersPerPage;
-    setPaginatedOrders(orders.slice(startIndex, endIndex));
-  }, [orders, currentPage, ordersPerPage]);
-
-  const handlePageChange = (pageNumber) => {
-    setCurrentPage(pageNumber);
-  };
-
-  const fetchOrderDetail = async (orderId) => {
+  const fetchOrderDetail = useCallback(async (orderId) => {
     setDetailLoading(true);
     try {
-      const response = await fetch(`http://localhost:5001/api/get-order/${orderId}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/get-order/${orderId}`);
       if (!response.ok) throw new Error("Failed to fetch order details");
       const data = await response.json();
       setSelectedOrder(data.order);
@@ -95,6 +82,22 @@ export default function OrdersPage() {
     } finally {
       setDetailLoading(false);
     }
+  }, [setSelectedOrder, setDetailLoading]);
+
+  // 3. ALL useEffect HOOKS LAST
+  useEffect(() => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * ordersPerPage;
+    const endIndex = startIndex + ordersPerPage;
+    setPaginatedOrders(orders.slice(startIndex, endIndex));
+  }, [orders, currentPage, ordersPerPage]);
+
+  // All other functions after useEffect
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
   };
 
   return (
@@ -249,7 +252,7 @@ function OrderDetailModal({ order, loading, onClose }) {
   const handlePrintOrder = async (orderId) => {
     setIsPrinting(true);
     try {
-      const response = await fetch(`http://localhost:5001/api/generate-sales-order-pdf/${orderId}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/generate-sales-order-pdf/${orderId}`);
       if (!response.ok) {
         const errorText = await response.text();
         throw new Error(`Failed to generate PDF: ${response.status} - ${errorText}`);

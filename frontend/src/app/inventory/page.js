@@ -49,7 +49,7 @@ export default function InventoryPage() {
   const fetchInventory = async () => {
     try {
       setLoading(true);
-      const response = await fetch("http://localhost:5001/api/products");
+      const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/products`);
       if (!response.ok) throw new Error("Failed to fetch inventory");
       const data = await response.json();
       // Defensive: ensure inventory is always an array

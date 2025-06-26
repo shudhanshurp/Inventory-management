@@ -15,7 +15,8 @@ export default function HomePage() {
     setResponse(null);
     setIsLoading(true);
     try {
-      const res = await fetch("http://localhost:5001/api/process-order", {
+      
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/process-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email_text: emailText }),
@@ -50,7 +51,7 @@ export default function HomePage() {
           AI Email Order Processor
         </h1>
         <p className="mb-8 text-black">
-          Paste the customer's email below to automatically extract and validate
+          Paste the email below to automatically extract and validate
           the order.
         </p>
 

@@ -91,14 +91,14 @@ export default function DashboardPage() {
       
       // Fetch KPIs, Sales Trends, Order Status, Inventory Health, Product Performance, Sales Forecast, Inventory Needs Forecast, and Catalog Suggestions concurrently using Promise.all
       const [kpisRes, salesTrendsRes, orderStatusRes, inventoryHealthRes, productPerformanceRes, salesForecastRes, inventoryNeedsForecastRes, catalogSuggestionsRes] = await Promise.all([
-        fetch(`http://localhost:5001/api/analytics/kpis?time_filter=${timeFilter}`),
-        fetch(`http://localhost:5001/api/analytics/sales-trends?time_filter=${timeFilter}&granularity=${salesGranularity}`),
-        fetch(`http://localhost:5001/api/analytics/order-status?time_filter=${timeFilter}`),
-        fetch(`http://localhost:5001/api/analytics/inventory-health`),
-        fetch(`http://localhost:5001/api/analytics/product-performance?time_filter=${timeFilter}&top_n=5`),
-        fetch(`http://localhost:5001/api/analytics/forecast/sales?time_filter=${timeFilter}&periods=3&granularity=${salesGranularity}`),
-        fetch(`http://localhost:5001/api/analytics/forecast/inventory-needs?time_filter=${timeFilter}&top_n=5&periods=3&granularity=month`),
-        fetch(`http://localhost:5001/api/analytics/suggest-catalog-items?time_filter=${timeFilter}&top_n=5`)
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/analytics/kpis?time_filter=${timeFilter}`),
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/analytics/sales-trends?time_filter=${timeFilter}&granularity=${salesGranularity}`),
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/analytics/order-status?time_filter=${timeFilter}`),
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/analytics/inventory-health`),
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/analytics/product-performance?time_filter=${timeFilter}&top_n=5`),
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/analytics/forecast/sales?time_filter=${timeFilter}&periods=3&granularity=${salesGranularity}`),
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/analytics/forecast/inventory-needs?time_filter=${timeFilter}&top_n=5&periods=3&granularity=month`),
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/analytics/suggest-catalog-items?time_filter=${timeFilter}&top_n=5`)
       ]);
       
       if (!kpisRes.ok || !salesTrendsRes.ok || !orderStatusRes.ok || !inventoryHealthRes.ok || !productPerformanceRes.ok || !salesForecastRes.ok || !inventoryNeedsForecastRes.ok || !catalogSuggestionsRes.ok) {
