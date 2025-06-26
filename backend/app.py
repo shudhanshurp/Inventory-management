@@ -12,6 +12,9 @@ from db import get_customers, get_products, get_orders, update_product_stock, ge
 from services.order_processor import OrderProcessor
 from services.pdf_service import PdfService
 from services.analytics_service import AnalyticsService
+from services.info_extractor_service import InfoExtractorService
+from services.validator_service import ValidatorService
+from services.db_update_service import DBUpdateService
 
 # Validate configuration
 Config.validate()
@@ -22,6 +25,9 @@ CORS(app, resources={r"/api/*": {"origins": Config.CORS_ORIGINS}})
 
 # Initialize services
 # analyst_service = AnalystService()
+info_extractor_service = InfoExtractorService()
+validator_service = ValidatorService()
+db_update_service = DBUpdateService()
 communications_service = CommunicationsService()
 pdf_service = PdfService()
 
@@ -31,137 +37,13 @@ analytics_service = AnalyticsService(_get_orders_async, _get_all_customers_dict_
 # Asynchronously load data into the analytics_service once at startup
 run_async(analytics_service.load_cached_data())
 
-class TwoAgentOrderProcessor:
-    """Two-Agent Order Processing System."""
-    
-    def __init__(self):
-        self.customers = get_customers()
-        self.products = get_products()
-        # self.analyst = analyst_service
-        self.communications = communications_service
-    
-    def process_order(self, email_text: str) -> Dict:
-        """Process order using the two-agent system with order record creation."""
-        # TODO: This method needs to be implemented properly
-        # Currently has issues with missing analyst service and save_order function
-        raise NotImplementedError("Order processing not yet implemented")
-        
-        # try:
-        #     # Step 1: Create new order record
-        #     order_id = self._generate_order_id()
-        #     order_record = self._create_order_record(order_id, email_text)
-        #     
-        #     # Step 2: Perform validation (existing logic)
-        #     briefing_document = self.analyst.analyze_order(email_text, self.customers, self.products)
-        #     
-        #     # Step 3: Update order status based on validation results
-        #     self._update_order_status(order_record, briefing_document)
-        #     
-        #     # Step 4: Adjust inventory if order is confirmed
-        #     if order_record["status"] == "Confirmed":
-        #         self._adjust_inventory(order_record)
-        #     
-        #     # Step 5: Generate customer response
-        #     customer_response = self.communications.generate_customer_response(briefing_document)
-        #     
-        #     # Step 6: Update order with final details
-        #     self._update_order_details(order_record, briefing_document, customer_response)
-        #     
-        #     # Step 7: Save order to database
-        #     save_order(order_record)
-        #     
-        #     return self._prepare_final_response(briefing_document, customer_response, order_record)
-        #     
-        # except Exception as e:
-        #     raise Exception(f"Failed to process order: {str(e)}")
-    
-    def _generate_order_id(self) -> str:
-        """Generate a unique order ID."""
-        year = datetime.now().year
-        # Get existing orders to count
-        existing_orders = get_orders()
-        count = len([order for order in existing_orders if str(year) in order["order_id"]]) + 1
-        return f"ORD-{year}-{count:03d}"
-    
-    def _create_order_record(self, order_id: str, email_text: str) -> Dict:
-        """Create initial order record."""
-        return {
-            "order_id": order_id,
-            "customer_id": None,
-            "products": [],
-            "total_value": 0,
-            "status": "Processing",
-            "email_text": email_text,
-            "created_at": datetime.now().isoformat(),
-            "updated_at": datetime.now().isoformat(),
-            "customer_response": None,
-            "analysis": None
-        }
-    
-    def _update_order_status(self, order_record: Dict, briefing_document: Dict):
-        """Update order status based on validation results."""
-        customer_status = briefing_document["customer_info"]["status"]
-        error_count = briefing_document["error_count"]
-        
-        if customer_status == "unknown_customer":
-            order_record["status"] = "Hold"
-        elif error_count > 0:
-            order_record["status"] = "Waiting for Confirmation"
-        else:
-            order_record["status"] = "Confirmed"
-        
-        order_record["updated_at"] = datetime.now().isoformat()
-    
-    def _adjust_inventory(self, order_record: Dict):
-        """Adjust inventory for confirmed orders."""
-        for item in order_record["products"]:
-            product_id = item["product_id"]
-            quantity = item["quantity"]
-            
-            if product_id in self.products:
-                current_stock = self.products[product_id]["stock"]
-                new_stock = current_stock - quantity
-                # Update in database
-                update_product_stock(product_id, new_stock)
-                # Update local cache
-                self.products[product_id]["stock"] = new_stock
-    
-    def _update_order_details(self, order_record: Dict, briefing_document: Dict, customer_response: str):
-        """Update order with final details from analysis."""
-        order_record["customer_id"] = briefing_document["customer_info"]["id"]
-        order_record["products"] = briefing_document["successful_items"] + briefing_document["error_items"]
-        order_record["total_value"] = sum(item.get("price", 0) * item.get("quantity", 0) for item in briefing_document["successful_items"])
-        order_record["customer_response"] = customer_response
-        order_record["analysis"] = briefing_document
-        order_record["updated_at"] = datetime.now().isoformat()
-    
-    def _prepare_final_response(self, briefing_document: Dict, customer_response: str, order_record: Dict) -> Dict:
-        """Prepare the final API response."""
-        status = "success" if briefing_document["overall_status"] == "success" else "error"
-        
-        return {
-            "status": status,
-            "message": customer_response,
-            "order_id": order_record["order_id"],
-            "order_status": order_record["status"],
-            "analysis": {
-                "customer_info": briefing_document["customer_info"],
-                "overall_status": briefing_document["overall_status"],
-                "successful_items": briefing_document["successful_items"],
-                "error_items": briefing_document["error_items"],
-                "suggestions": briefing_document["suggestions"],
-                "summary": {
-                    "total_items": briefing_document["total_items"],
-                    "successful_count": briefing_document["successful_count"],
-                    "error_count": briefing_document["error_count"]
-                }
-            }
-        }
-
-
 # Initialize order processor
-order_processor = TwoAgentOrderProcessor()
-
+order_processor_instance = OrderProcessor(
+    info_extractor_service_instance=info_extractor_service,
+    validator_service_instance=validator_service,
+    communications_service_instance=communications_service,
+    db_update_service_instance=db_update_service
+)
 
 @app.route("/api/process-order", methods=["POST"])
 def process_order():
@@ -170,9 +52,13 @@ def process_order():
         email_text = request.json.get("email_text")
         if not email_text:
             return jsonify({"error": "Email text is required"}), 400
-        result = OrderProcessor.process_order(email_text)
+        # print(f"[APP-PROCESS] Received email_text (first 100 chars): {email_text[:100]}...")
+        # print("[APP-PROCESS] Calling OrderProcessor.process_order...")
+        result = order_processor_instance.process_order(email_text)
+        # print(f"[APP-PROCESS] OrderProcessor.process_order returned: {result.get('order_id')}, Status: {result.get('order_status')}")
         return jsonify(result)
     except Exception as e:
+        print(f"[APP-PROCESS] Error processing order in endpoint: {e}")
         return jsonify({"error": str(e)}), 500
 
 

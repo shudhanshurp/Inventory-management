@@ -7,7 +7,7 @@ from datetime import datetime
 
 class PdfService:
     def generate_sales_order_pdf(self, order_data: dict) -> bytes:
-        print("[PdfService] order_data received:", order_data)
+        # print("[PdfService] order_data received:", order_data)
         buffer = BytesIO()
         c = canvas.Canvas(buffer, pagesize=A4)
         width, height = A4
@@ -62,7 +62,7 @@ class PdfService:
 
         # 5. Table Data Text Placement
         items = order_data.get('items', [])
-        print("[PdfService] items:", items)
+        # print("[PdfService] items:", items)
         total_amount = 0
         for row in range(num_data_rows):
             data_y = table_header_top_y - table_header_height - (row * table_data_row_height)

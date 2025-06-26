@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 class DBUpdateService:
     @staticmethod
     def update_order(validation: ValidationResult) -> OrderUpdateResult:
+        # print(f"[DBUpdateService] update_order called. Overall Status: {validation.overall_status}")
         try:
             result = asyncio.get_event_loop().run_until_complete(DBUpdateService._update_order_async(validation))
             return result
@@ -47,6 +48,7 @@ class DBUpdateService:
                 return OrderUpdateResult(success=False, details="Database connection failed.")
             async with conn.transaction():
                 if validation.overall_status.lower() in ["success", "confirmed"]:
+                    # print("[DBUpdateService] Processing CONFIRMED order logic.")
                     for item in validation.successful_items:
                         stock_row = await conn.fetchrow("SELECT p_stock FROM products WHERE p_id = $1 FOR UPDATE;", item.product_id)
                         if not stock_row:
@@ -93,8 +95,10 @@ class DBUpdateService:
                             order_id, item.product_id, p_name, item.quantity, p_price, oi_total, True
                         )
                         details.append(f"Created order item for {item.product_id} (qty {item.quantity})")
+                    # print(f"[DBUpdateService] Order {order_id} inserted successfully.")
                     return OrderUpdateResult(success=True, order_id=str(order_id), details="; ".join(details))
                 else:
+                    # print(f"[DBUpdateService] Processing HOLD/FAILED order logic for status: {validation.overall_status}")
                     status = "Hold" if validation.overall_status.lower() in ["partial_success", "unknown_customer"] else "Failed"
                     customer_id = validation.customer_info.get("id")
                     if not customer_id:
@@ -116,8 +120,13 @@ class DBUpdateService:
                     )
                     
                     details.append(f"Order created with status {status}")
+                    # print(f"[DBUpdateService] Preparing to insert order into DB. Customer ID: {validation.customer_info.get('id')}, Status: {validation.overall_status}")
+                    # print(f"[DBUpdateService] Order items to insert: {[item.product_id for item in validation.successful_items]}")
+                    # print(f"[DBUpdateService] Order {order_id} inserted successfully.")
+                    # print(f"[DBUpdateService] Hold/Failed order remarks: {getattr(validation, 'analysis', {}).get('summary', {}).get('error_count', 0)} errors. Overall status: {validation.overall_status}")
                     return OrderUpdateResult(success=False, order_id=str(order_id), details="; ".join(details))
         except Exception as e:
+            # print(f"[DBUpdateService] Error during DB update: {e}")
             if conn:
                 await conn.rollback()
             return OrderUpdateResult(success=False, order_id=str(order_id) if order_id else None, details=f"Error: {str(e)}")

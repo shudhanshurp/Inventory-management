@@ -109,7 +109,7 @@ async def _get_orders_async():
         )
         orders_list = []
         for order in orders:
-            print(f"[DB] _get_orders_async: Fetching items for order {order['o_id']}")
+            # print(f"[DB] _get_orders_async: Fetching items for order {order['o_id']}")
             items = await connection.fetch(
                 "SELECT p_id, p_name, oi_qty, oi_price, oi_total FROM order_items WHERE o_id = $1;",
                 order["o_id"]
@@ -136,7 +136,7 @@ async def _get_orders_async():
                 "o_status": order["o_status"],
                 "items": items_list
             }
-            print(f"[DB] _get_orders_async: Order {order_dict['o_id']} customer info: {order_dict.get('c_name')}, {order_dict.get('c_address')}")
+            # print(f"[DB] _get_orders_async: Order {order_dict['o_id']} customer info: {order_dict.get('c_name')}, {order_dict.get('c_address')}")
             orders_list.append(order_dict)
         print("[DB] _get_orders_async: Closing connection after orders fetch.")
         await connection.close()
