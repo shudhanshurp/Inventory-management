@@ -48,6 +48,14 @@ const Navbar = () => {
               Analysis Dashboard
             </Link>
           </li>
+          <li>
+            <Link
+              href="/test-cases"
+              className="transition hover:text-blue-600"
+            >
+              Test Cases
+            </Link>
+          </li>
         </ul>
       </nav>
     </header>

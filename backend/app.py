@@ -15,6 +15,7 @@ from services.analytics_service import AnalyticsService
 from services.info_extractor_service import InfoExtractorService
 from services.validator_service import ValidatorService
 from services.db_update_service import DBUpdateService
+from services.test_case_generator_service import TestCaseGeneratorService
 
 # Validate configuration
 Config.validate()
@@ -36,6 +37,9 @@ analytics_service = AnalyticsService(_get_orders_async, _get_all_customers_dict_
 
 # Asynchronously load data into the analytics_service once at startup
 run_async(analytics_service.load_cached_data())
+
+# Instantiate TestCaseGeneratorService
+test_case_generator_service = TestCaseGeneratorService(get_customers, get_products)
 
 # Initialize order processor
 order_processor_instance = OrderProcessor(
@@ -258,6 +262,17 @@ def analytics_catalog_suggestions_endpoint():
         result = asyncio.run(analytics_service.get_catalog_suggestions(time_filter=time_filter, top_n=top_n))
         return jsonify(result)
     except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/api/generate-test-cases", methods=["GET"])
+def generate_test_cases_endpoint():
+    """Generate test cases for order processing."""
+    try:
+        import asyncio
+        result = asyncio.run(test_case_generator_service.generate_test_cases())
+        return jsonify({"test_cases": result})
+    except Exception as e:
+        print(f"[APP] Error generating test cases: {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
