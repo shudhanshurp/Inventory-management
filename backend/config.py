@@ -9,7 +9,7 @@ class Config:
     
     DEBUG = True
     PORT = 5001
-    CORS_ORIGINS = ["http://localhost:3000"]
+    CORS_ORIGINS = ["http://localhost:3000", "https://ordersense.vercel.app"]
     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
     GEMINI_MODEL = "gemini-1.5-flash"
     
