@@ -185,7 +185,7 @@ export default function TestCasesPage() {
               No test cases generated yet
             </h3>
             <p className="text-gray-500">
-              Click the "Generate Test Cases" button above to create test scenarios.
+              Click the button above to create test scenarios.
             </p>
           </div>
         )}
