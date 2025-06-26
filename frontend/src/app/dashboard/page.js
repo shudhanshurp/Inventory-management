@@ -49,6 +49,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [timeFilter, setTimeFilter] = useState("last_30_days");
+  const [salesGranularity, setSalesGranularity] = useState("month");
 
   // Revised Nivo Data Strategy: connect forecast to last historical point
   const lastHistoricalIndex = salesForecast.map(item => item.type).lastIndexOf('historical');
@@ -81,22 +82,64 @@ export default function DashboardPage() {
     count: orderStatusDistribution[status],
   }));
 
+  // Dynamic axis configuration based on granularity
+  const getAxisBottomConfig = () => {
+    if (salesGranularity === 'year') {
+      return {
+        tickRotation: 0, // No rotation needed for year labels
+        legend: 'Year',
+        legendOffset: 40,
+        tickSize: 8,
+        tickPadding: 8,
+        tickComponent: ({ value, ...props }) => (
+          <text {...props} style={{ fontSize: '12px', fontWeight: '500' }}>
+            {value}
+          </text>
+        )
+      };
+    } else if (salesGranularity === 'week') {
+      return {
+        tickRotation: -45,
+        legend: 'Week',
+        legendOffset: 50,
+        tickSize: 5,
+        tickPadding: 5
+      };
+    } else {
+      return {
+        tickRotation: -45,
+        legend: 'Month',
+        legendOffset: 50,
+        tickSize: 5,
+        tickPadding: 5
+      };
+    }
+  };
+
   const fetchDashboardData = async () => {
     setLoading(true);
     setError(null);
     
     try {
       // Determine granularity based on time filter
-      const salesGranularity = (timeFilter === 'last_7_days' || timeFilter === 'last_30_days') ? 'week' : 'month';
+      let granularity = 'month'; // Default
+      if (timeFilter === 'last_7_days' || timeFilter === 'last_30_days') {
+        granularity = 'week';
+      } else if (timeFilter === 'all_time') {
+        granularity = 'year'; // New rule for all_time
+      }
+      
+      // Update the salesGranularity state
+      setSalesGranularity(granularity);
       
       // Fetch KPIs, Sales Trends, Order Status, Inventory Health, Product Performance, Sales Forecast, Inventory Needs Forecast, and Catalog Suggestions concurrently using Promise.all
       const [kpisRes, salesTrendsRes, orderStatusRes, inventoryHealthRes, productPerformanceRes, salesForecastRes, inventoryNeedsForecastRes, catalogSuggestionsRes] = await Promise.all([
         fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/analytics/kpis?time_filter=${timeFilter}`),
-        fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/analytics/sales-trends?time_filter=${timeFilter}&granularity=${salesGranularity}`),
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/analytics/sales-trends?time_filter=${timeFilter}&granularity=${granularity}`),
         fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/analytics/order-status?time_filter=${timeFilter}`),
         fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/analytics/inventory-health`),
         fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/analytics/product-performance?time_filter=${timeFilter}&top_n=5`),
-        fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/analytics/forecast/sales?time_filter=${timeFilter}&periods=3&granularity=${salesGranularity}`),
+        fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/analytics/forecast/sales?time_filter=${timeFilter}&periods=3&granularity=${granularity}`),
         fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/analytics/forecast/inventory-needs?time_filter=${timeFilter}&top_n=5&periods=3&granularity=month`),
         fetch(`${process.env.NEXT_PUBLIC_BACKEND_API_URL}/analytics/suggest-catalog-items?time_filter=${timeFilter}&top_n=5`)
       ]);
@@ -269,16 +312,12 @@ export default function DashboardPage() {
               margin={{ top: 20, right: 30, bottom: 60, left: 70 }}
               xScale={{ type: 'point' }}
               yScale={{ type: 'linear', min: 'auto', max: 'auto' }}
-              axisBottom={{
-                tickRotation: -45,
-                legend: 'Period',
-                legendOffset: 50
-              }}
+              axisBottom={getAxisBottomConfig()}
               axisLeft={{
                 legend: 'Revenue ($)',
                 legendOffset: -60
               }}
-              pointSize={6}
+              pointSize={salesGranularity === 'year' ? 8 : 6}
               pointBorderWidth={2}
               pointBorderColor={{ from: 'serieColor' }}
               enableGridX={false}
@@ -288,22 +327,37 @@ export default function DashboardPage() {
               enableSlices="x"
               animate={true}
               motionConfig="stiff"
-              lineWidth={3}
+              lineWidth={salesGranularity === 'year' ? 4 : 3}
               lineStyle={[
-                { strokeDasharray: '0' }, // Solid line for historical
-                { strokeDasharray: '5,5' } // Dashed line for forecast
+                { strokeDasharray: '0' },
+                { strokeDasharray: '5,5' }
               ]}
-              tooltip={({ point }) => (
-                <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
-                  <div className="font-semibold text-gray-800">{point.data.x}</div>
-                  <div className={`font-medium ${point.serieId === 'Historical Revenue' ? 'text-blue-600' : 'text-green-600'}`}>
-                    {point.serieId}: {formatCurrency(point.data.y)}
+              tooltip={({ point }) => {
+                const isYear = salesGranularity === 'year';
+                const periodLabel = isYear ? 'Year' : salesGranularity === 'week' ? 'Week' : 'Month';
+                
+                return (
+                  <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
+                    <div className="font-semibold text-gray-800">
+                      {periodLabel}: {point.data.x}
+                    </div>
+                    <div className={`font-medium ${point.serieId === 'Historical Revenue' ? 'text-blue-600' : 'text-green-600'}`}>
+                      {point.serieId === 'Historical Revenue' ? 'Historical' : 'Forecasted'}: {formatCurrency(point.data.y)}
+                    </div>
+                    {point.serieId === 'Forecasted Revenue' && (
+                      <div className="text-xs text-gray-500 mt-1">(Projected)</div>
+                    )}
+                    {isYear && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        Annual data point
+                      </div>
+                    )}
                   </div>
-                  {point.serieId === 'Forecasted Revenue' && (
-                    <div className="text-xs text-gray-500 mt-1">(Projected)</div>
-                  )}
-                </div>
-              )}
+                );
+              }}
+              enablePointLabel={false}
+              useMesh={true}
+              crosshairType="x"
             />
           </div>
         ) : (

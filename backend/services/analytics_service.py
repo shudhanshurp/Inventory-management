@@ -122,6 +122,8 @@ class AnalyticsService:
                     period_str = o_placed_time.strftime("%Y-%m")
                 elif granularity == "week":
                     period_str = o_placed_time.strftime("%Y-%W")
+                elif granularity == "year":
+                    period_str = o_placed_time.strftime("%Y")
                 else:
                     raise ValueError(f"Unknown granularity: {granularity}")
                 for item in order.get("items", []):
@@ -141,6 +143,10 @@ class AnalyticsService:
                 while current <= end_date:
                     periods.append(current.strftime("%Y-%W"))
                     current += timedelta(weeks=1)
+            elif granularity == "year":
+                while current <= end_date:
+                    periods.append(current.strftime("%Y"))
+                    current = current.replace(year=current.year + 1)
             # Build final sorted list
             result = []
             for period in sorted(periods):
@@ -305,6 +311,8 @@ class AnalyticsService:
                 df['ds'] = pd.to_datetime(df['ds'], format='%Y-%m')
             elif granularity == 'week':
                 df['ds'] = pd.to_datetime(df['ds'] + '-1', format='%Y-%W-%w')
+            elif granularity == 'year':
+                df['ds'] = pd.to_datetime(df['ds'], format='%Y')
             else:
                 raise ValueError(f"Unsupported granularity for forecasting: {granularity}")
             
@@ -320,6 +328,8 @@ class AnalyticsService:
                 future = model.make_future_dataframe(periods=periods_to_forecast, freq='MS')
             elif granularity == 'week':
                 future = model.make_future_dataframe(periods=periods_to_forecast, freq='W-MON')
+            elif granularity == 'year':
+                future = model.make_future_dataframe(periods=periods_to_forecast, freq='AS')
             else:
                 raise ValueError(f"Unsupported granularity for forecasting: {granularity}")
             forecast_df = model.predict(future)
@@ -330,6 +340,8 @@ class AnalyticsService:
                 period_format = "%Y-%m"
             elif granularity == 'week':
                 period_format = "%Y-%W"
+            elif granularity == 'year':
+                period_format = "%Y"
             else:
                 period_format = "%Y-%m"
             # Find the last historical ds for type assignment
