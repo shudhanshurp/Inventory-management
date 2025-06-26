@@ -4,8 +4,8 @@ google-generativeai==0.8.5
 asyncpg==0.29.0
 pydantic==2.11.7
 python-dotenv==1.0.1
-prophet==1.1.5
+prophet==1.1.1
 pandas==2.1.4
-pystan==2.19.1.1
+# pystan==2.19.1.1
 langchain
 reportlab
