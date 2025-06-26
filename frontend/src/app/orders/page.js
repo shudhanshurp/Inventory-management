@@ -1,6 +1,6 @@
 "use client";
 
-import { History, X, Package, User, Calendar, DollarSign } from "lucide-react";
+import { History, X, Package, User, Calendar, DollarSign, RefreshCw } from "lucide-react";
 import { useState, useEffect } from "react";
 
 // Move these helpers OUTSIDE the component
@@ -218,6 +218,8 @@ export default function OrdersPage() {
 
 // OrderDetailModal: shows full order details
 function OrderDetailModal({ order, loading, onClose }) {
+  const [isPrinting, setIsPrinting] = useState(false);
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -245,14 +247,21 @@ function OrderDetailModal({ order, loading, onClose }) {
 
   // Print handler
   const handlePrintOrder = async (orderId) => {
+    setIsPrinting(true);
     try {
       const response = await fetch(`http://localhost:5001/api/generate-sales-order-pdf/${orderId}`);
-      if (!response.ok) throw new Error('Failed to generate PDF');
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Failed to generate PDF: ${response.status} - ${errorText}`);
+      }
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       window.open(url, '_blank');
     } catch (err) {
-      alert('Failed to generate PDF.');
+      console.error("Error generating PDF:", err);
+      alert(err.message || "Could not generate PDF. Please try again.");
+    } finally {
+      setIsPrinting(false);
     }
   };
 
@@ -265,9 +274,11 @@ function OrderDetailModal({ order, loading, onClose }) {
             <div className="flex gap-2">
               <button
                 onClick={() => handlePrintOrder(order.o_id || order.order_id)}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+                disabled={isPrinting}
+                className="bg-green-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Print
+                {isPrinting && <RefreshCw className="h-4 w-4 animate-spin" />}
+                {isPrinting ? "Generating PDF..." : "Print"}
               </button>
               <button
                 onClick={onClose}
