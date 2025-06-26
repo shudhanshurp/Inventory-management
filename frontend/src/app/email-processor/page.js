@@ -58,7 +58,6 @@ export default function HomePage() {
           <textarea
             value={emailText}
             onChange={(e) => setEmailText(e.target.value)}
-            // placeholder="Hi team,&#10;&#10;Please place an order for me. My customer ID is CUST101.&#10;&#10;I need:&#10;- 2x PROD001&#10;- 1x PROD003&#10;&#10;Thanks,&#10;Alice"
             placeholder="Enter your email here"
             className="h-48 w-full text-black rounded-lg border border-gray-300 p-4 shadow-sm transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
             required
