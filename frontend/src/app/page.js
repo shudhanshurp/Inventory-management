@@ -27,7 +27,7 @@ export default function LandingPage() {
             eliminating errors.
           </p>
           <Link
-            href="/processor"
+            href="/email-processor"
             className="mt-8 inline-block bg-blue-600 text-white font-bold py-3 px-8 rounded-lg text-lg transition hover:bg-blue-700"
           >
             Go to Processor
